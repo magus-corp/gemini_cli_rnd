@@ -23,7 +23,7 @@ import { WebFetchTool } from '../tools/web-fetch.js';
 import { ReadManyFilesTool } from '../tools/read-many-files.js';
 import { MemoryTool, setGeminiMdFilename } from '../tools/memoryTool.js';
 import { WebSearchTool } from '../tools/web-search.js';
-import { GeminiClient } from '../core/client.js';
+import { LlmClient, getLlmClient } from '../llm/index.js';
 import { GEMINI_CONFIG_DIR as GEMINI_DIR } from '../tools/memoryTool.js';
 import { FileDiscoveryService } from '../services/fileDiscoveryService.js';
 import { GitService } from '../services/gitService.js';
@@ -125,6 +125,10 @@ export interface ConfigParameters {
   fileDiscoveryService?: FileDiscoveryService;
   bugCommand?: BugCommandSettings;
   model: string;
+  openaiApiKey?: string;
+  langfusePublicKey?: string;
+  langfuseSecretKey?: string;
+  langfuseHost?: string;
   extensionContextFilePaths?: string[];
 }
 
@@ -151,7 +155,7 @@ export class Config {
   private readonly accessibility: AccessibilitySettings;
   private readonly telemetrySettings: TelemetrySettings;
   private readonly usageStatisticsEnabled: boolean;
-  private geminiClient!: GeminiClient;
+  private llmClient!: LlmClient;
   private readonly fileFiltering: {
     respectGitIgnore: boolean;
     enableRecursiveFileSearch: boolean;
@@ -163,6 +167,10 @@ export class Config {
   private readonly cwd: string;
   private readonly bugCommand: BugCommandSettings | undefined;
   private readonly model: string;
+  private readonly openaiApiKey: string | undefined;
+  private readonly langfusePublicKey: string | undefined;
+  private readonly langfuseSecretKey: string | undefined;
+  private readonly langfuseHost: string | undefined;
   private readonly extensionContextFilePaths: string[];
   private modelSwitchedDuringSession: boolean = false;
   flashFallbackHandler?: FlashFallbackHandler;
@@ -206,6 +214,10 @@ export class Config {
     this.fileDiscoveryService = params.fileDiscoveryService ?? null;
     this.bugCommand = params.bugCommand;
     this.model = params.model;
+    this.openaiApiKey = params.openaiApiKey;
+    this.langfusePublicKey = params.langfusePublicKey;
+    this.langfuseSecretKey = params.langfuseSecretKey;
+    this.langfuseHost = params.langfuseHost;
     this.extensionContextFilePaths = params.extensionContextFilePaths ?? [];
 
     if (params.contextFileName) {
@@ -243,13 +255,14 @@ export class Config {
     const contentConfig = await createContentGeneratorConfig(
       modelToUse,
       authMethod,
-      this,
+      {
+        getModel: () => this.model,
+        openaiApiKey: this.openaiApiKey,
+      },
     );
 
-    const gc = new GeminiClient(this);
-    this.geminiClient = gc;
     this.toolRegistry = await createToolRegistry(this);
-    await gc.initialize(contentConfig);
+    this.llmClient = await getLlmClient(this);
     this.contentGeneratorConfig = contentConfig;
 
     // Reset the session flag since we're explicitly changing auth and using default model
@@ -395,8 +408,8 @@ export class Config {
     return this.telemetrySettings.target ?? DEFAULT_TELEMETRY_TARGET;
   }
 
-  getGeminiClient(): GeminiClient {
-    return this.geminiClient;
+  getLlmClient(): LlmClient {
+    return this.llmClient;
   }
 
   getGeminiDir(): string {
@@ -429,6 +442,22 @@ export class Config {
 
   getBugCommand(): BugCommandSettings | undefined {
     return this.bugCommand;
+  }
+
+  getOpenaiApiKey(): string | undefined {
+    return this.openaiApiKey;
+  }
+
+  getLangfusePublicKey(): string | undefined {
+    return this.langfusePublicKey;
+  }
+
+  getLangfuseSecretKey(): string | undefined {
+    return this.langfuseSecretKey;
+  }
+
+  getLangfuseHost(): string | undefined {
+    return this.langfuseHost;
   }
 
   getFileService(): FileDiscoveryService {

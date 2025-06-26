@@ -17,6 +17,7 @@ import {
   GenerateContentResponseUsageMetadata,
 } from '@google/genai';
 import { retryWithBackoff } from '../utils/retry.js';
+import { langfuse } from '../telemetry/langfuse.js';
 import { isFunctionResponse } from '../utils/messageInspectors.js';
 import { ContentGenerator, AuthType } from './contentGenerator.js';
 import { Config } from '../config/config.js';
@@ -261,6 +262,17 @@ export class GeminiChat {
     const startTime = Date.now();
     let response: GenerateContentResponse;
 
+    const trace = langfuse.trace({
+      name: 'sendMessage',
+      input: {
+        message: params.message,
+        history: this.getHistory(true),
+      },
+      metadata: {
+        model: this.config.getModel(),
+      },
+    });
+
     try {
       const apiCall = () =>
         this.contentGenerator.generateContent({
@@ -287,6 +299,15 @@ export class GeminiChat {
         response.usageMetadata,
         getStructuredResponse(response),
       );
+
+      trace.score({
+        name: 'sendMessage_success',
+        value: 1,
+        comment: 'Success',
+      });
+      trace.update({
+        output: response,
+      });
 
       this.sendPromise = (async () => {
         const outputContent = response.candidates?.[0]?.content;
@@ -316,6 +337,11 @@ export class GeminiChat {
     } catch (error) {
       const durationMs = Date.now() - startTime;
       this._logApiError(durationMs, error);
+      trace.score({
+        name: 'sendMessage',
+        value: 0,
+        comment: (error as Error).message,
+      });
       this.sendPromise = Promise.resolve();
       throw error;
     }
@@ -359,6 +385,17 @@ export class GeminiChat {
 
     const startTime = Date.now();
 
+    const trace = langfuse.trace({
+      name: 'sendMessageStream',
+      input: {
+        message: params.message,
+        history: this.getHistory(true),
+      },
+      metadata: {
+        model,
+      },
+    });
+
     try {
       const apiCall = () =>
         this.contentGenerator.generateContentStream({
@@ -385,6 +422,11 @@ export class GeminiChat {
         authType: this.config.getContentGeneratorConfig()?.authType,
       });
 
+      trace.score({
+        value: 1,
+        comment: 'Stream started',
+      });
+
       // Resolve the internal tracking of send completion promise - `sendPromise`
       // for both success and failure response. The actual failure is still
       // propagated by the `await streamResponse`.
@@ -401,6 +443,11 @@ export class GeminiChat {
     } catch (error) {
       const durationMs = Date.now() - startTime;
       this._logApiError(durationMs, error);
+      trace.score({
+        name: 'sendMessage',
+        value: 0,
+        comment: (error as Error).message,
+      });
       this.sendPromise = Promise.resolve();
       throw error;
     }

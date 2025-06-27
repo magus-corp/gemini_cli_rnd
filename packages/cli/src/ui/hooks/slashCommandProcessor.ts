@@ -19,7 +19,6 @@ import {
   getMCPDiscoveryState,
   getMCPServerStatus,
 } from '@google/gemini-cli-core';
-
 import { useSessionStats } from '../contexts/SessionContext.js';
 import {
   Message,
@@ -227,7 +226,7 @@ export const useSlashCommandProcessor = (
         action: async (_mainCommand, _subCommand, _args) => {
           onDebugMessage('Clearing terminal and resetting chat.');
           clearItems();
-          await config?.getLlmClient()?.resetChat();
+          await config?.getGeminiClient()?.resetChat();
           console.clear();
           refreshStatic();
         },
@@ -669,7 +668,7 @@ export const useSlashCommandProcessor = (
           const tag = (args || '').trim();
           const logger = new Logger(config?.getSessionId() || '');
           await logger.initialize();
-          const chat = await config?.getLlmClient()?.getHistory();
+          const chat = await config?.getGeminiClient()?.getChat();
           if (!chat) {
             addMessage({
               type: MessageType.ERROR,
@@ -711,7 +710,7 @@ export const useSlashCommandProcessor = (
               }
 
               clearItems();
-              await chat.resetChat();
+              chat.clearHistory();
               const rolemap: { [key: string]: MessageType } = {
                 user: MessageType.USER,
                 model: MessageType.GEMINI,
@@ -825,7 +824,7 @@ export const useSlashCommandProcessor = (
           });
           try {
             const compressed = await config!
-              .getLlmClient()!
+              .getGeminiClient()!
               .tryCompressChat(true);
             if (compressed) {
               addMessage({
@@ -946,7 +945,7 @@ export const useSlashCommandProcessor = (
 
             if (toolCallData.clientHistory) {
               await config
-                ?.getLlmClient()
+                ?.getGeminiClient()
                 ?.setHistory(toolCallData.clientHistory);
             }
 

@@ -17,7 +17,6 @@ import {
   GenerateContentResponseUsageMetadata,
 } from '@google/genai';
 import { retryWithBackoff } from '../utils/retry.js';
-import { langfuse } from '../telemetry/langfuse.js';
 import { isFunctionResponse } from '../utils/messageInspectors.js';
 import { ContentGenerator, AuthType } from './contentGenerator.js';
 import { Config } from '../config/config.js';
@@ -35,10 +34,7 @@ import {
   ApiRequestEvent,
   ApiResponseEvent,
 } from '../telemetry/types.js';
-import {
-  DEFAULT_GEMINI_FLASH_MODEL,
-  DEFAULT_GEMINI_MODEL,
-} from '../config/models.js';
+import { DEFAULT_GEMINI_FLASH_MODEL } from '../config/models.js';
 
 /**
  * Returns true if the response is valid, false otherwise.
@@ -262,17 +258,6 @@ export class GeminiChat {
     const startTime = Date.now();
     let response: GenerateContentResponse;
 
-    const trace = langfuse.trace({
-      name: 'sendMessage',
-      input: {
-        message: params.message,
-        history: this.getHistory(true),
-      },
-      metadata: {
-        model: this.config.getModel(),
-      },
-    });
-
     try {
       const apiCall = () =>
         this.contentGenerator.generateContent({
@@ -299,15 +284,6 @@ export class GeminiChat {
         response.usageMetadata,
         getStructuredResponse(response),
       );
-
-      trace.score({
-        name: 'sendMessage_success',
-        value: 1,
-        comment: 'Success',
-      });
-      trace.update({
-        output: response,
-      });
 
       this.sendPromise = (async () => {
         const outputContent = response.candidates?.[0]?.content;
@@ -337,11 +313,6 @@ export class GeminiChat {
     } catch (error) {
       const durationMs = Date.now() - startTime;
       this._logApiError(durationMs, error);
-      trace.score({
-        name: 'sendMessage',
-        value: 0,
-        comment: (error as Error).message,
-      });
       this.sendPromise = Promise.resolve();
       throw error;
     }
@@ -375,31 +346,14 @@ export class GeminiChat {
     await this.sendPromise;
     const userContent = createUserContent(params.message);
     const requestContents = this.getHistory(true).concat(userContent);
-
-    const model = await this._selectModel(
-      requestContents,
-      params.config?.abortSignal ?? new AbortController().signal,
-    );
-
-    this._logApiRequest(requestContents, model);
+    this._logApiRequest(requestContents, this.config.getModel());
 
     const startTime = Date.now();
-
-    const trace = langfuse.trace({
-      name: 'sendMessageStream',
-      input: {
-        message: params.message,
-        history: this.getHistory(true),
-      },
-      metadata: {
-        model,
-      },
-    });
 
     try {
       const apiCall = () =>
         this.contentGenerator.generateContentStream({
-          model,
+          model: this.config.getModel(),
           contents: requestContents,
           config: { ...this.generationConfig, ...params.config },
         });
@@ -422,11 +376,6 @@ export class GeminiChat {
         authType: this.config.getContentGeneratorConfig()?.authType,
       });
 
-      trace.score({
-        value: 1,
-        comment: 'Stream started',
-      });
-
       // Resolve the internal tracking of send completion promise - `sendPromise`
       // for both success and failure response. The actual failure is still
       // propagated by the `await streamResponse`.
@@ -443,89 +392,8 @@ export class GeminiChat {
     } catch (error) {
       const durationMs = Date.now() - startTime;
       this._logApiError(durationMs, error);
-      trace.score({
-        name: 'sendMessage',
-        value: 0,
-        comment: (error as Error).message,
-      });
       this.sendPromise = Promise.resolve();
       throw error;
-    }
-  }
-
-  /**
-   * Selects the model to use for the request.
-   *
-   * This is a placeholder for now.
-   */
-  private async _selectModel(
-    history: Content[],
-    signal: AbortSignal,
-  ): Promise<string> {
-    const currentModel = this.config.getModel();
-    if (currentModel === DEFAULT_GEMINI_FLASH_MODEL) {
-      return DEFAULT_GEMINI_FLASH_MODEL;
-    }
-
-    if (
-      history.length < 5 &&
-      this.config.getContentGeneratorConfig().authType === AuthType.USE_GEMINI
-    ) {
-      // There's currently a bug where for Gemini API key usage if we try and use flash as one of the first
-      // requests in our sequence that it will return an empty token.
-      return DEFAULT_GEMINI_MODEL;
-    }
-
-    const flashIndicator = 'flash';
-    const proIndicator = 'pro';
-    const modelChoicePrompt = `You are a super-intelligent router that decides which model to use for a given request. You have two models to choose from: "${flashIndicator}" and "${proIndicator}". "${flashIndicator}" is a smaller and faster model that is good for simple or well defined requests. "${proIndicator}" is a larger and slower model that is good for complex or undefined requests.
-
-Based on the user request, which model should be used? Respond with a JSON object that contains a single field, \`model\`, whose value is the name of the model to be used.
-
-For example, if you think "${flashIndicator}" should be used, respond with: { "model": "${flashIndicator}" }`;
-    const modelChoiceContent: Content[] = [
-      {
-        role: 'user',
-        parts: [{ text: modelChoicePrompt }],
-      },
-    ];
-
-    const client = this.config.getGeminiClient();
-    try {
-      const choice = await client.generateJson(
-        [...history, ...modelChoiceContent],
-        {
-          type: 'object',
-          properties: {
-            model: {
-              type: 'string',
-              enum: [flashIndicator, proIndicator],
-            },
-          },
-          required: ['model'],
-        },
-        signal,
-        DEFAULT_GEMINI_FLASH_MODEL,
-        {
-          temperature: 0,
-          maxOutputTokens: 25,
-          thinkingConfig: {
-            thinkingBudget: 0,
-          },
-        },
-      );
-
-      switch (choice.model) {
-        case flashIndicator:
-          return DEFAULT_GEMINI_FLASH_MODEL;
-        case proIndicator:
-          return DEFAULT_GEMINI_MODEL;
-        default:
-          return currentModel;
-      }
-    } catch (_e) {
-      // If the model selection fails, just use the default flash model.
-      return DEFAULT_GEMINI_FLASH_MODEL;
     }
   }
 

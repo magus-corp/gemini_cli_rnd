@@ -8,6 +8,7 @@ import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { useInput } from 'ink';
 import {
   Config,
+  GeminiClient,
   GeminiEventType as ServerGeminiEventType,
   ServerGeminiStreamEvent as GeminiEvent,
   ServerGeminiContentEvent as ContentEvent,
@@ -24,7 +25,6 @@ import {
   UnauthorizedError,
   UserPromptEvent,
 } from '@google/gemini-cli-core';
-import { LlmClient } from '@google/gemini-cli-core/llm';
 import { type Part, type PartListUnion } from '@google/genai';
 import {
   StreamingState,
@@ -76,7 +76,7 @@ enum StreamProcessingStatus {
  * API interaction, and tool call lifecycle.
  */
 export const useGeminiStream = (
-  llmClient: LlmClient,
+  geminiClient: GeminiClient,
   history: HistoryItem[],
   addItem: UseHistoryManagerReturn['addItem'],
   setShowHelp: React.Dispatch<React.SetStateAction<boolean>>,
@@ -146,7 +146,7 @@ export const useGeminiStream = (
     onExec,
     onDebugMessage,
     config,
-    llmClient,
+    geminiClient,
   );
 
   const streamingState = useMemo(() => {
@@ -520,7 +520,7 @@ export const useGeminiStream = (
       setInitError(null);
 
       try {
-        const stream = llmClient.sendMessageStream(queryToSend, abortSignal);
+        const stream = geminiClient.sendMessageStream(queryToSend, abortSignal);
         const processingStatus = await processGeminiStreamEvents(
           stream,
           userMessageTimestamp,
@@ -563,7 +563,7 @@ export const useGeminiStream = (
       addItem,
       setPendingHistoryItem,
       setInitError,
-      llmClient,
+      geminiClient,
       startNewTurn,
       onAuthError,
       config,
@@ -653,7 +653,7 @@ export const useGeminiStream = (
       );
 
       if (allToolsCancelled) {
-        if (llmClient) {
+        if (geminiClient) {
           // We need to manually add the function responses to the history
           // so the model knows the tools were cancelled.
           const responsesToAdd = geminiTools.flatMap(
@@ -701,7 +701,7 @@ export const useGeminiStream = (
     submitQuery,
     markToolsAsSubmitted,
     addItem,
-    llmClient,
+    geminiClient,
     performMemoryRefresh,
   ]);
 
@@ -774,7 +774,7 @@ export const useGeminiStream = (
             const toolName = toolCall.request.name;
             const fileName = path.basename(filePath);
             const toolCallWithSnapshotFileName = `${timestamp}-${fileName}-${toolName}.json`;
-            const clientHistory = await llmClient?.getHistory();
+            const clientHistory = await geminiClient?.getHistory();
             const toolCallWithSnapshotFilePath = path.join(
               checkpointDir,
               toolCallWithSnapshotFileName,
@@ -808,7 +808,7 @@ export const useGeminiStream = (
       }
     };
     saveRestorableToolCalls();
-  }, [toolCalls, config, onDebugMessage, gitService, history, llmClient]);
+  }, [toolCalls, config, onDebugMessage, gitService, history, geminiClient]);
 
   return {
     streamingState,

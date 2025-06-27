@@ -63,11 +63,6 @@ export interface Settings {
 
   // UI setting. Does not display the ANSI-controlled terminal title.
   hideWindowTitle?: boolean;
-  langfusePublicKey?: string;
-  langfuseSecretKey?: string;
-  langfuseHost?: string;
-  openaiApiKey?: string;
-  openaiBaseUrl?: string;
 
   // Add other settings here.
 }

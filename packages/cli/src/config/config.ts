@@ -41,7 +41,6 @@ const logger = {
 
 interface CliArgs {
   model: string | undefined;
-  'openai-api-key': string | undefined;
   sandbox: boolean | string | undefined;
   'sandbox-image': string | undefined;
   debug: boolean | undefined;
@@ -63,10 +62,6 @@ async function parseArguments(): Promise<CliArgs> {
       type: 'string',
       description: `Model`,
       default: process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL,
-    })
-    .option('openai-api-key', {
-      type: 'string',
-      description: 'OpenAI API Key',
     })
     .option('prompt', {
       alias: 'p',
@@ -249,11 +244,6 @@ export async function loadCliConfig(
     fileDiscoveryService: fileService,
     bugCommand: settings.bugCommand,
     model: argv.model!,
-    openaiApiKey: argv['openai-api-key'] ?? settings.openaiApiKey,
-    openaiBaseUrl: settings.openaiBaseUrl,
-    langfusePublicKey: settings.langfusePublicKey,
-    langfuseSecretKey: settings.langfuseSecretKey,
-    langfuseHost: settings.langfuseHost,
     extensionContextFilePaths,
   });
 }

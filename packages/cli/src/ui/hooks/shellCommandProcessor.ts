@@ -8,8 +8,7 @@ import { spawn } from 'child_process';
 import { StringDecoder } from 'string_decoder';
 import type { HistoryItemWithoutId } from '../types.js';
 import { useCallback } from 'react';
-import { Config } from '@google/gemini-cli-core';
-import { LlmClient } from '@google/gemini-cli-core/llm';
+import { Config, GeminiClient } from '@google/gemini-cli-core';
 import { type PartListUnion } from '@google/genai';
 import { formatMemoryUsage } from '../utils/formatters.js';
 import { isBinary } from '../utils/textUtils.js';
@@ -174,7 +173,7 @@ function executeShellCommand(
 }
 
 function addShellCommandToGeminiHistory(
-  llmClient: LlmClient,
+  geminiClient: GeminiClient,
   rawQuery: string,
   resultText: string,
 ) {
@@ -183,7 +182,7 @@ function addShellCommandToGeminiHistory(
       ? resultText.substring(0, MAX_OUTPUT_LENGTH) + '\n... (truncated)'
       : resultText;
 
-  llmClient.addHistory({
+  geminiClient.addHistory({
     role: 'user',
     parts: [
       {
@@ -213,7 +212,7 @@ export const useShellCommandProcessor = (
   onExec: (command: Promise<void>) => void,
   onDebugMessage: (message: string) => void,
   config: Config,
-  llmClient: LlmClient,
+  geminiClient: GeminiClient,
 ) => {
   const handleShellCommand = useCallback(
     (rawQuery: PartListUnion, abortSignal: AbortSignal): boolean => {
@@ -310,7 +309,7 @@ export const useShellCommandProcessor = (
             );
 
             // Add the same complete, contextual result to the LLM's history.
-            addShellCommandToGeminiHistory(llmClient, rawQuery, finalOutput);
+            addShellCommandToGeminiHistory(geminiClient, rawQuery, finalOutput);
           })
           .catch((err) => {
             setPendingHistoryItem(null);
@@ -341,7 +340,7 @@ export const useShellCommandProcessor = (
       addItemToHistory,
       setPendingHistoryItem,
       onExec,
-      llmClient,
+      geminiClient,
     ],
   );
 

@@ -2,7 +2,6 @@
   "name": "@google/gemini-cli-core",
   "version": "0.1.5",
   "description": "Gemini CLI Server",
-  "repository": "google-gemini/gemini-cli",
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
@@ -16,8 +15,7 @@
     "typecheck": "tsc --noEmit",
     "prerelease:version": "node ../../scripts/bind_package_version.js",
     "prerelease:deps": "node ../../scripts/bind_package_dependencies.js",
-    "prepack": "npm run build",
-    "prepublishOnly": "node ../../scripts/prepublish.js"
+    "prepack": "npm run build"
   },
   "files": [
     "dist"

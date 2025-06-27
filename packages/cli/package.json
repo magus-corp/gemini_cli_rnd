@@ -2,7 +2,6 @@
   "name": "@google/gemini-cli",
   "version": "0.1.5",
   "description": "Gemini CLI",
-  "repository": "google-gemini/gemini-cli",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
@@ -20,14 +19,13 @@
     "typecheck": "tsc --noEmit",
     "prerelease:version": "node ../../scripts/bind_package_version.js",
     "prerelease:deps": "node ../../scripts/bind_package_dependencies.js",
-    "prepack": "npm run build",
-    "prepublishOnly": "node ../../scripts/prepublish.js"
+    "prepack": "npm run build"
   },
   "files": [
     "dist"
   ],
   "config": {
-    "sandboxImageUri": "gemini-cli-sandbox"
+    "sandboxImageUri": "us-docker.pkg.dev/gemini-code-dev/gemini-cli/sandbox:0.1.1"
   },
   "dependencies": {
     "@google/gemini-cli-core": "*",
